@@ -30,13 +30,26 @@ public class Concept2Manager : MonoBehaviour
         public float PowerWatts;             // instantaneous power
         public float DistanceMeters;         // elapsed distance (cumulative)
         public float DriveRatio;             // DriveTime / (DriveTime + RecoveryTime) — estimated from timing
+        public float DriveTimeSeconds;       // per stroke drive phase when available
+        public float PullDistance;           // normalized pull distance when available
+        public int HeartRate;
         public DateTime Timestamp;
     }
 
     public static Concept2Manager Instance { get; private set; }
 
+    public enum Concept2TransportMode
+    {
+        UsbBridge,
+        BleBridge,
+        Simulation
+    }
+
     [Header("Bridge Settings")]
+    public Concept2TransportMode transportMode = Concept2TransportMode.UsbBridge;
     public string bridgeExePath = "ErgBridge/ErgBridge.exe";
+    public string bleBridgeExePath = "ERGBridgeBLE/ErgBridgeBLE.exe";
+    public int bleBridgePort = 6790;
 
     [Header("Debug / Simulation")]
     public bool simulateInput = false;
@@ -81,11 +94,19 @@ public class Concept2Manager : MonoBehaviour
 
     private void Start()
     {
-        if (simulateInput)
+        if (transportMode == Concept2TransportMode.Simulation || simulateInput)
         {
+            transportMode = Concept2TransportMode.Simulation;
             _isConnected = true;
             OnConnectionStatusChanged?.Invoke("Simulation mode enabled");
             Debug.Log("[Concept2Manager] Simulation mode.");
+            return;
+        }
+
+        if (transportMode == Concept2TransportMode.BleBridge)
+        {
+            OnConnectionStatusChanged?.Invoke($"BLE bridge mode configured. Expected executable: {bleBridgeExePath} (TCP {bleBridgePort})");
+            Debug.Log("[Concept2Manager] BLE bridge mode is scaffolded but not connected yet in Imagine. Use the Strength-ERG bridge as the transport source.");
             return;
         }
 
@@ -128,7 +149,7 @@ public class Concept2Manager : MonoBehaviour
     }
 
     /// <summary>
-    /// Launches ErgBridge.exe (the PM5 communication bridge).
+    /// Launches ErgBridge.exe (the PM5 USB communication bridge).
     /// </summary>
     private void LaunchBridge()
     {
@@ -326,6 +347,46 @@ public class Concept2Manager : MonoBehaviour
 
         string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
         return Path.GetFullPath(Path.Combine(projectRoot, bridgeExePath));
+    }
+
+    public byte[] BuildCsafeFrame(params byte[] payload)
+    {
+        return CSAFECommands.WrapFrame(payload);
+    }
+
+    public byte[] BuildStrokeStatsCommand()
+    {
+        return BuildCsafeFrame(CSAFECommands.ProprietaryWrapper, 0x02, CSAFECommands.GetStrokeStats, 0x00);
+    }
+
+    public byte[] BuildGetWorkTimeCommand()
+    {
+        return BuildCsafeFrame(CSAFECommands.GetWorkTime);
+    }
+
+    public byte[] BuildGetHeartRateCommand()
+    {
+        return BuildCsafeFrame(CSAFECommands.GetHeartRate);
+    }
+
+    public RowingStrokeData CreateStrokeFromBleRep(Concept2BleModels.BleRepMessage rep)
+    {
+        float driveRatio = Mathf.Clamp01(rep.driveTimeSec / Mathf.Max(rep.driveTimeSec + 1f, 0.01f));
+        float inferredPower = Mathf.Max(0f, rep.pullDistance * 5f);
+        float inferredSpm = rep.driveTimeSec > 0f ? Mathf.Clamp(60f / Mathf.Max(rep.driveTimeSec * 3f, 0.25f), 1f, 80f) : 0f;
+
+        return new RowingStrokeData
+        {
+            StrokesPerMinute = inferredSpm,
+            PaceSecondsPer500m = _currentPace,
+            PowerWatts = inferredPower,
+            DistanceMeters = rep.elapsedSec,
+            DriveRatio = driveRatio,
+            DriveTimeSeconds = rep.driveTimeSec,
+            PullDistance = rep.pullDistance,
+            HeartRate = rep.heartRate,
+            Timestamp = DateTime.UtcNow
+        };
     }
 
     private void OnDestroy()
