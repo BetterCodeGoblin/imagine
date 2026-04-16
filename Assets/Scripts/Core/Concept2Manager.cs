@@ -2,6 +2,8 @@ using UnityEngine;
 using System;
 using System.Diagnostics;
 using System.IO;
+using Debug = UnityEngine.Debug;
+using Process = System.Diagnostics.Process;
 
 /// <summary>
 /// Concept2Manager — Manages Concept 2 PM5 rowing machine integration.
@@ -10,7 +12,7 @@ using System.IO;
 /// ErgBridge launches as a separate process and streams data via TCP/IP.
 /// 
 /// Data flow:
-/// 1. ErgManager launches ErgBridge.exe process
+/// 1. Concept2Manager launches ErgBridge.exe process
 /// 2. ErgBridgeClient connects via TCP to localhost:6789
 /// 3. Polling loop requests data, receives rate/pace/power updates
 /// 4. Parsed into session-aware stroke tracking
@@ -49,6 +51,7 @@ public class Concept2Manager : MonoBehaviour
     private bool _isConnected = false;
 
     private Process _bridgeProcess;
+    private float _connectionStatusLogCooldown = 0f;
     private ErgBridgeClient _bridgeClient;
     private RowingStrokeData _lastStroke;
     private float _timeSinceLastStroke = 0f;
@@ -87,14 +90,14 @@ public class Concept2Manager : MonoBehaviour
         }
 
         LaunchBridge();
-
-        // Add ErgBridgeClient component and subscribe to data
-        _bridgeClient = gameObject.AddComponent<ErgBridgeClient>();
-        _bridgeClient.OnDataReceived += OnErgDataReceived;
+        EnsureBridgeClient();
     }
 
     private void Update()
     {
+        if (_connectionStatusLogCooldown > 0f)
+            _connectionStatusLogCooldown -= Time.deltaTime;
+
         if (simulateInput)
         {
             _currentStrokeRate = simulatedStrokeRate;
@@ -102,8 +105,8 @@ public class Concept2Manager : MonoBehaviour
             _currentPace = simulatedPace;
             _timeSinceLastStroke += Time.deltaTime;
 
-            // Simulate a stroke event every ~2.7 seconds at 22 SPM
-            if (_timeSinceLastStroke > 2.7f)
+            float simulatedStrokeInterval = Mathf.Max(0.25f, 60f / Mathf.Max(1f, simulatedStrokeRate));
+            if (_timeSinceLastStroke >= simulatedStrokeInterval)
             {
                 GenerateSimulatedStroke();
                 _timeSinceLastStroke = 0f;
@@ -113,11 +116,14 @@ public class Concept2Manager : MonoBehaviour
 
         _timeSinceLastStroke += Time.deltaTime;
 
-        // Timeout detection: if no strokes for 2+ seconds, player has stopped
         if (_timeSinceLastStroke > STROKE_TIMEOUT_SECONDS && _isConnected)
         {
-            // BoulderSystem listens for this and handles drift
-            // This just tracks timing
+            _isConnected = false;
+            if (_connectionStatusLogCooldown <= 0f)
+            {
+                OnConnectionStatusChanged?.Invoke("PM5 connected, waiting for next stroke...");
+                _connectionStatusLogCooldown = 2f;
+            }
         }
     }
 
@@ -128,19 +134,26 @@ public class Concept2Manager : MonoBehaviour
     {
         try
         {
-            string fullPath = Path.Combine(Application.dataPath, "..", bridgeExePath);
-            fullPath = Path.GetFullPath(fullPath);
+            string fullPath = ResolveBridgeExecutablePath();
 
-            if (!File.Exists(fullPath))
+            if (string.IsNullOrWhiteSpace(fullPath) || !File.Exists(fullPath))
             {
                 Debug.LogError($"[Concept2Manager] Bridge not found at: {fullPath}");
                 OnConnectionStatusChanged?.Invoke($"ErgBridge not found at {fullPath}");
                 return;
             }
 
+            if (_bridgeProcess != null && !_bridgeProcess.HasExited)
+            {
+                Debug.Log("[Concept2Manager] ErgBridge already running.");
+                OnConnectionStatusChanged?.Invoke("ErgBridge already running. Waiting for connection...");
+                return;
+            }
+
             ProcessStartInfo psi = new ProcessStartInfo
             {
                 FileName = fullPath,
+                WorkingDirectory = Path.GetDirectoryName(fullPath),
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
@@ -164,10 +177,19 @@ public class Concept2Manager : MonoBehaviour
         _currentStrokeRate = rate;
         _currentPace = pace;
         _currentPower = power;
-        _isConnected = connected;
 
-        // If SPM changed significantly, consider it a new stroke for event firing
-        if (rate > 0f && _timeSinceLastStroke > 0.5f) // Debounce: min 0.5s between "strokes"
+        if (_isConnected != connected)
+        {
+            _isConnected = connected;
+            OnConnectionStatusChanged?.Invoke(connected ? "PM5 connected" : "PM5 disconnected");
+            if (!connected)
+                OnDisconnected?.Invoke();
+        }
+
+        if (!connected)
+            return;
+
+        if (rate > 0f && _timeSinceLastStroke > 0.5f)
         {
             _lastStroke = new RowingStrokeData
             {
@@ -175,7 +197,7 @@ public class Concept2Manager : MonoBehaviour
                 PaceSecondsPer500m = pace,
                 PowerWatts = power,
                 DriveRatio = EstimateDriveRatio(rate, power),
-                Timestamp = DateTime.Now
+                Timestamp = DateTime.UtcNow
             };
 
             _timeSinceLastStroke = 0f;
@@ -194,7 +216,8 @@ public class Concept2Manager : MonoBehaviour
             PaceSecondsPer500m = simulatedPace,
             PowerWatts = simulatedPower,
             DriveRatio = EstimateDriveRatio(simulatedStrokeRate, simulatedPower),
-            Timestamp = DateTime.Now
+            DistanceMeters = Mathf.Max(0f, _lastStroke.DistanceMeters + (500f / Mathf.Max(1f, simulatedPace)) * (60f / Mathf.Max(1f, simulatedStrokeRate))),
+            Timestamp = DateTime.UtcNow
         };
 
         OnStrokeDataReceived?.Invoke(_lastStroke);
@@ -251,13 +274,58 @@ public class Concept2Manager : MonoBehaviour
 
     public void Disconnect()
     {
-        if (_bridgeProcess != null && !_bridgeProcess.HasExited)
+        if (_bridgeClient != null)
+            _bridgeClient.OnDataReceived -= OnErgDataReceived;
+
+        if (_bridgeProcess != null)
         {
-            _bridgeProcess.Kill();
-            Debug.Log("[Concept2Manager] ErgBridge killed.");
+            try
+            {
+                if (!_bridgeProcess.HasExited)
+                {
+                    _bridgeProcess.Kill();
+                    _bridgeProcess.WaitForExit(1000);
+                    Debug.Log("[Concept2Manager] ErgBridge killed.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[Concept2Manager] Failed to stop ErgBridge cleanly: {ex.Message}");
+            }
+            finally
+            {
+                _bridgeProcess.Dispose();
+                _bridgeProcess = null;
+            }
         }
+
         _isConnected = false;
+        OnConnectionStatusChanged?.Invoke("PM5 disconnected");
         OnDisconnected?.Invoke();
+    }
+
+    private void EnsureBridgeClient()
+    {
+        if (_bridgeClient == null)
+            _bridgeClient = GetComponent<ErgBridgeClient>();
+
+        if (_bridgeClient == null)
+            _bridgeClient = gameObject.AddComponent<ErgBridgeClient>();
+
+        _bridgeClient.OnDataReceived -= OnErgDataReceived;
+        _bridgeClient.OnDataReceived += OnErgDataReceived;
+    }
+
+    private string ResolveBridgeExecutablePath()
+    {
+        if (string.IsNullOrWhiteSpace(bridgeExePath))
+            return string.Empty;
+
+        if (Path.IsPathRooted(bridgeExePath))
+            return Path.GetFullPath(bridgeExePath);
+
+        string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, ".."));
+        return Path.GetFullPath(Path.Combine(projectRoot, bridgeExePath));
     }
 
     private void OnDestroy()

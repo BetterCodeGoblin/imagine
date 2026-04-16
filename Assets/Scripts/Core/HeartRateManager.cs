@@ -100,12 +100,14 @@ public class HeartRateManager : MonoBehaviour
         _currentBPM = bpm;
         _currentHRZone = CalculateHRZone(bpm);
 
+        _isConnected = true;
+
         _lastReading = new HRData
         {
             BPM = bpm,
             RRIntervals = rrIntervals,
             HRZone = _currentHRZone,
-            Timestamp = DateTime.Now
+            Timestamp = DateTime.UtcNow
         };
 
         // Calculate HRV if RR intervals available
@@ -128,9 +130,10 @@ public class HeartRateManager : MonoBehaviour
     /// </summary>
     private int CalculateHRZone(int bpm)
     {
-        float hrr = _maxHR - _restingHR;
-        float percentHRR = (_currentBPM - _restingHR) / hrr;
+        float hrr = Mathf.Max(1f, _maxHR - _restingHR);
+        float percentHRR = (bpm - _restingHR) / hrr;
 
+        if (percentHRR <= 0f) return 0;
         if (percentHRR < 0.60f) return 1;
         if (percentHRR < 0.70f) return 2;
         if (percentHRR < 0.80f) return 3;
@@ -197,7 +200,10 @@ public class HeartRateManager : MonoBehaviour
     // Stub: Will be implemented in v1.0
     public bool TryConnectBLE(string deviceName = null)
     {
-        Debug.Log("[HeartRateManager] BLE HRM connection is a v1.0 feature. Using simulation or manual injection.");
+        Debug.LogWarning("[HeartRateManager] BLE HRM connection is not implemented yet. Use simulation or InjectHRData until the BLE layer is added.");
+        OnConnectionStatusChanged?.Invoke(string.IsNullOrWhiteSpace(deviceName)
+            ? "BLE HRM integration not implemented yet"
+            : $"BLE HRM integration not implemented yet for {deviceName}");
         return false;
     }
 }

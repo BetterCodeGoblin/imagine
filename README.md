@@ -1,261 +1,166 @@
 # IMAGINE — Sisyphean Exercise Game Suite
 
-A philosophical game about eternal struggle, powered by real exercise machines and evidence-based training science.
+A philosophical exercise game scaffold built in Unity around rowing, cycling, and strength training loops.
 
-**Status:** MVP in development. TheClimb (rowing) functional scaffold with Concept 2 integration.
+**Current state:** code-first prototype. The repository is ready for C# iteration and Unity assembly, but it does **not** yet include committed scenes, prefabs, UI, or polished hardware plugins.
 
 ---
 
-## Quick Start
+## What is in this repo right now
 
-### Prerequisites
-- **Unity 6.0 LTS** or later
-- **Windows 10+** or **macOS 12+** (Linux support via Proton)
-- A Concept 2 RowErg/BikeErg or strength machine with BLE/USB output
+Included:
+- Core gameplay/system scripts under `Assets/Scripts/Core`
+- Mode scripts under `Assets/Scripts/Modes`
+- Unity project/package settings
+- Simulation-friendly scaffolding for early development
 
-### Clone & Open
+Not included yet:
+- Production scenes (`.unity`)
+- Prefabs, UI, and art setup
+- Full BLE device integration
+- Bundled ErgBridge binaries
+- Final persistence/database layer
+
+That split is intentional for now. This repo is meant to give you a solid script layer to assemble in-editor.
+
+---
+
+## Unity version
+
+- **Editor version:** Unity `6000.0.0f1`
+- Recommended: use Unity 6 to avoid package/version drift
+
+---
+
+## Quick start
+
 ```bash
 git clone https://github.com/BetterCodeGoblin/imagine.git
 cd imagine
 ```
 
-Open the project folder in Unity Editor (version 6000+).
+Open the folder in Unity 6.
 
-### Concept 2 SDK Setup
-The project uses **ErgBridge** — a compiled C# bridge DLL for PM5 communication. 
+### First assembly in Unity
 
-1. Copy the `ErgBridge/` folder (binaries) to your project root:
-   ```
-   imagine/ErgBridge/
-   ├── ErgBridge.exe
-   ├── ErgBridge.dll
-   ├── PM3CsafeCP.dll
-   ├── PM3DDICP.dll
-   └── PM3USBCP.dll
-   ```
+Because scenes are not committed yet, expect to wire things together manually in-editor.
 
-2. In Unity, assign the bridge path in any `Concept2Manager` inspector:
-   - Set `bridgeExePath = "ErgBridge/ErgBridge.exe"`
-   - The bridge auto-launches on play
+Recommended first scene setup:
+1. Create a new scene, for example `Assets/Scenes/TheClimbPrototype.unity`
+2. Add empty GameObjects for:
+   - `BoulderSystem`
+   - `Concept2Manager`
+   - `HeartRateManager`
+   - `TheClimb`
+3. Attach the matching scripts
+4. Enable simulation on hardware managers if you do not have devices connected yet:
+   - `Concept2Manager.simulateInput = true`
+   - `HeartRateManager.simulateHeartRate = true`
+5. Hook UI and narrator systems on top of the emitted events
 
-3. **Hardware Connection:**
-   - Connect your Concept 2 rowing machine via USB
-   - Launch a scene with Concept 2Manager active
-   - Bridge discovers PM5 and streams data via TCP/IP (localhost:6789)
-
-### Heart Rate Monitor (Optional)
-Connect any BLE Heart Rate Monitor (Polar H10, Wahoo TICKR, Garmin HRM-Pro, etc.):
-- **v1.0 feature:** Full BLE scanning and zone-aware training
-- **MVP:** Manual HR injection or simulation mode
+If you only need the C# layer, the repo is already structured for that workflow.
 
 ---
 
-## Architecture
+## Hardware integration status
 
-### Single Project, Three Modes (Scenes)
+### Concept 2 / PM5
 
-| Mode | Machine | File | Status |
-|------|---------|------|--------|
-| **TheClimb** | Concept 2 RowErg | `Assets/Scenes/TheClimb.unity` | MVP (functional scaffold) |
-| **TheAscent** | Smart Bike / Power Meter | `Assets/Scenes/TheAscent.unity` | v1.0 (stub) |
-| **TheBurden** | Strength Machines (HIT) | `Assets/Scenes/TheBurden.unity` | v1.0 (stub) |
+`Concept2Manager` expects an external ErgBridge executable that speaks to the PM5 and streams rowing data over localhost.
 
-### Core Systems
+Expected default path:
 
-**BoulderSystem** (`Assets/Scripts/Core/BoulderSystem.cs`)
-- Persistent progress tracking (lifetime altitude)
-- Session management (progress + regression)
-- Mid-session drift on rest
-- EPOC afterburn calculation
-- SQLite persistence (PlayerPrefs in MVP)
-
-**Concept2Manager** (`Assets/Scripts/Core/Concept2Manager.cs`)
-- Launches ErgBridge.exe (PM5 bridge)
-- TCP polling loop (10 Hz)
-- Stroke data parsing (SPM, watts, pace)
-- Form bonus calculation (drive ratio)
-
-**HeartRateManager** (`Assets/Scripts/Core/HeartRateManager.cs`)
-- BLE HRM scanning (v1.0)
-- Karvonen HR zone calculation (1-5)
-- RMSSD HRV tracking for recovery scoring
-- Simulation mode for testing
-
-**GameModeBase** (`Assets/Scripts/Modes/GameModeBase.cs`)
-- Abstract class for all three modes
-- Session lifecycle hooks
-- Narrator event callbacks
-- Progress → BoulderSystem wiring
-
-**TheClimb** (`Assets/Scripts/Modes/TheClimb.cs`)
-- Rowing-specific mechanics
-- Form bonus multiplier from drive ratio
-- SPM gate (min 14 SPM for progress)
-- HR zone-aware power multipliers
-- Narrator integration
-
----
-
-## Gameplay Flow
-
-### TheClimb (Rowing)
-
-1. **Start Session**
-   - BoulderSystem loads regression offset (time since last session)
-   - Concept2Manager connects to PM5
-   - Narrator greets you
-
-2. **Row**
-   - Each stroke fires `OnStrokeDataReceived` event
-   - Concept2Manager parses SPM, watts, pace, drive ratio
-   - TheClimb calculates progress:
-     ```
-     progress = watts × metersPerWatt × formBonus × hrZoneMultiplier
-     ```
-   - BoulderSystem adds altitude
-   - Narrator speaks at milestones (every 100 strokes)
-
-3. **Rest (>2 seconds)**
-   - BoulderSystem applies drift (backward movement)
-   - Drift accelerates if rest continues
-   - HR monitor can reduce drift if HR still elevated (EPOC effect)
-
-4. **End Session**
-   - BoulderSystem calculates EPOC (afterburn) score
-   - Sets regression suspension timer
-   - Saves to persistent storage
-   - Narrator acknowledges effort
-
----
-
-## Narrator System
-
-The Narrator is the game's philosophical voice. Integrate via:
-
-```csharp
-// In any GameModeBase subclass:
-TriggerNarrator("The mountain recognizes effort, not ego.");
+```text
+ErgBridge/ErgBridge.exe
 ```
 
-All three modes publish `OnNarratorLine` events. Wire a NarratorController to subscribe and play audio.
+The bridge is **not bundled** in this repository. You will need to provide it separately.
 
-Sample narrator lines are in the GDD: `/home/jsypherd/.openclaw/workspace/projects/unity/IMAGINE_GDD.md`
+Current behavior:
+- launches ErgBridge if present
+- connects to `127.0.0.1:6789`
+- parses `rate,pace,power,connected`
+- emits stroke events to gameplay systems
+- supports simulation mode for editor-side work
 
----
+### Heart rate monitor
 
-## Data Persistence
+`HeartRateManager` is currently scaffolded for:
+- simulated heart rate
+- manual HR injection via code
+- zone calculation
+- RR interval storage and RMSSD calculation
 
-**MVP:** PlayerPrefs + local JSON
-```csharp
-boulderState.LifetimeAltitude        // persistent altitude
-boulderState.LastSessionEnd          // for regression calc
-boulderState.AfterburnExpiryTime     // EPOC suspension
-```
+Actual BLE discovery/connection is **not implemented yet**.
 
-**v1.0:** SQLite via `SQLite4Unity`
-- Full session history
-- FTP test results (TheAscent)
-- HRV baseline (HeartRateManager)
-- Periodization blocks (meta-game)
+### Cycling and strength modes
 
----
-
-## Development Roadmap
-
-### MVP (In Progress)
-- [x] BoulderSystem (progress, regression, drift)
-- [x] Concept2Manager (PM5 USB bridge)
-- [x] TheClimb (rowing mechanics)
-- [ ] Basic UI (altitude display, HR zone color)
-- [ ] Narrator voiceover (~50 lines)
-- [ ] MainMenu scene
-
-### v1.0 (Target: ~10–12 months)
-- All three modes functional
-- FTP test protocol (TheAscent)
-- Manual TUT input (TheBurden)
-- Full narrator script (200+ lines)
-- Cloud sync (Firebase)
-- Leaderboards
-- Co-op (2-player shared boulder)
-
-### v2.0 (Target: +12 months)
-- Quest 3 VR (TheClimb VR)
-- Smart trainer FTMS control
-- Smart barbell/collar sensor
-- HRV recovery recommendations
-- DLC: Tantalus, Ixion, Prometheus modes
+- `TheAscent` is still a stub for future cycling hardware integration
+- `TheBurden` supports manual set logging and progression logic, not sensor-driven strength hardware yet
 
 ---
 
-## Hardware Support
+## Repository architecture
 
-### Concept 2 Rowing / Cycling
+### Core scripts
 
-| Model | Protocol | Support |
-|-------|----------|---------|
-| RowErg PM5 | USB + ErgData BLE | ✅ MVP (USB) |
-| BikeErg PM5 | USB + ErgData BLE | ✅ MVP (USB) |
-| SkiErg PM5 | USB + ErgData BLE | 📋 v1.0 |
-| PM3 / PM4 | Serial | 📋 v1.0 |
+- `Assets/Scripts/Core/BoulderSystem.cs`
+  - session progress
+  - lifetime progress
+  - regression / drift
+  - lightweight PlayerPrefs persistence
 
-### Power Meters & Smart Trainers
+- `Assets/Scripts/Core/Concept2Manager.cs`
+  - ErgBridge process launch
+  - PM5 connection state
+  - simulated strokes
+  - stroke event generation
 
-| Hardware | Protocol | Support |
-|----------|----------|---------|
-| Wahoo KICKR | ANT+ / BLE FTMS | 📋 v1.0 |
-| Tacx NEO | BLE FTMS | 📋 v1.0 |
-| Generic ANT+ | ANT+ Cycling Power | 📋 v1.0 |
-| Generic BLE | BLE Cycling Power (0x1818) | 📋 v1.0 |
+- `Assets/Scripts/Core/ErgBridgeClient.cs`
+  - TCP client for the local bridge
+  - background polling loop
+  - thread-safe handoff to Unity main thread
 
-### Heart Rate Monitors
+- `Assets/Scripts/Core/HeartRateManager.cs`
+  - HR zone logic
+  - simulated/manual HR injection
+  - RMSSD support for future recovery features
 
-| Hardware | Protocol | Support |
-|----------|----------|---------|
-| Polar H10 | BLE HRS (0x180D) | 📋 v1.0 |
-| Wahoo TICKR | BLE HRS | 📋 v1.0 |
-| Garmin HRM-Pro | BLE HRS | 📋 v1.0 |
-| Chest Straps | BLE HRS | 📋 v1.0 |
+### Mode scripts
 
-### Strength Machines
+- `Assets/Scripts/Modes/GameModeBase.cs`
+- `Assets/Scripts/Modes/TheClimb.cs`
+- `Assets/Scripts/Modes/TheAscent.cs`
+- `Assets/Scripts/Modes/TheBurden.cs`
 
-| Hardware | Support |
-|----------|---------|
-| Keiser M-series (BLE) | 📋 v1.0 |
-| Vmaxpro collar (BLE) | 📋 v1.0 |
-| Phone camera (ML pose) | 📋 v2.0 |
-| Manual rep logging | ✅ MVP |
+These are meant to be attached to scene objects once you assemble the Unity side.
 
 ---
 
-## References
+## Recommended next steps
 
-- **Game Design Document:** See `IMAGINE_GDD.md` in the workspace
-- **Exercise Science:**
-  - Karvonen formula (HR zones)
-  - Progressive overload (strength)
-  - EPOC (afterburn mechanism)
-  - HIT protocol (High Intensity Training)
-- **Literature:**
-  - Albert Camus — *The Myth of Sisyphus* (1942)
-  - Bennett Foddy — *Getting Over It* (game design inspiration)
-  - Arthur Jones — *Nautilus Training Principles*
-  - Doug McGuff & John Little — *Body by Science*
+1. Create prototype scenes in Unity
+2. Add a minimal HUD for altitude, HR zone, and connection status
+3. Drop in ErgBridge locally if testing against a real PM5
+4. Reuse proven Strength-ERG code for:
+   - CSAFE command handling
+   - PM5 parsing details
+   - Bluetooth connectivity where it is already battle-tested
+5. Promote persistence from PlayerPrefs to a more durable session/history layer when needed
 
 ---
 
-## Contributing
+## Reality check
 
-This is a personal project by **James Sypherd**, authored with **Kato** (AI assistant).
+This repo is now best thought of as:
+- **ready for code work**
+- **ready for Unity-side assembly**
+- **not yet a frictionless clone-and-play project**
 
-Hardware integration, testing, and scene design contributions welcome. Fork and submit a PR.
+That is okay. If your immediate goal is to get the script layer solid and then assemble in engine, this repo is in the right shape for that.
 
 ---
 
 ## License
 
 Proprietary (all rights reserved). Contact `sypherdj1@gmail.com` for inquiries.
-
----
-
-*One must imagine Sisyphus happy. One must also imagine him well-trained.*

@@ -16,8 +16,8 @@ public class BoulderSystem : MonoBehaviour
     [System.Serializable]
     public class SessionData
     {
-        public DateTime StartTime;
-        public DateTime EndTime;
+        public string StartTimeUtc;
+        public string EndTimeUtc;
         public string GameMode; // "Climb", "Summit", "Burden"
         public float SessionAltitude; // distance/TUT this session
         public float LifetimeAltitude; // persistent total
@@ -33,8 +33,8 @@ public class BoulderSystem : MonoBehaviour
         public float LifetimeAltitude; // primary persistent stat
         public float LifetimeTUT; // total time under tension (Burden mode)
         public float LifetimeSessionHours;
-        public DateTime LastSessionEnd;
-        public DateTime AfterburnExpiryTime; // when EPOC suspension ends
+        public string LastSessionEndUtc;
+        public string AfterburnExpiryUtc; // when EPOC suspension ends
         public string BoulderCustomization; // JSON: stone type, markings, name
     }
 
@@ -42,6 +42,7 @@ public class BoulderSystem : MonoBehaviour
 
     private BoulderState boulderState = new BoulderState();
     private SessionData currentSession = new SessionData();
+    private float currentSessionElapsedSeconds = 0f;
 
     private const float BASE_DRIFT_RATE = 1f; // units/second at rest
     private const float DRIFT_ACCELERATION_FACTOR = 1.5f;
@@ -70,6 +71,7 @@ public class BoulderSystem : MonoBehaviour
     {
         if (!currentSession.IsActive) return;
 
+        currentSessionElapsedSeconds += Time.deltaTime;
         timeSinceLastInput += Time.deltaTime;
 
         // Check if resting
@@ -84,18 +86,23 @@ public class BoulderSystem : MonoBehaviour
     /// </summary>
     public void StartSession(string gameMode)
     {
+        float startingLifetimeAltitude = Mathf.Max(0f, boulderState.LifetimeAltitude - CalculateRegressionOffset());
+
         currentSession = new SessionData
         {
-            StartTime = DateTime.Now,
+            StartTimeUtc = DateTime.UtcNow.ToString("O"),
             GameMode = gameMode,
             SessionAltitude = 0f,
-            LifetimeAltitude = boulderState.LifetimeAltitude - CalculateRegressionOffset(),
+            LifetimeAltitude = startingLifetimeAltitude,
             IsActive = true
         };
+
+        boulderState.LifetimeAltitude = startingLifetimeAltitude;
 
         // Clamp regression — never drop below zero
         currentSession.LifetimeAltitude = Mathf.Max(0, currentSession.LifetimeAltitude);
 
+        currentSessionElapsedSeconds = 0f;
         OnProgressChanged?.Invoke($"Session started: {gameMode}. Altitude: {currentSession.LifetimeAltitude:F0}m");
     }
 
@@ -149,30 +156,30 @@ public class BoulderSystem : MonoBehaviour
     /// </summary>
     private float CalculateRegressionOffset()
     {
-        if (boulderState.LastSessionEnd == DateTime.MinValue)
+        if (!TryParseUtc(boulderState.LastSessionEndUtc, out DateTime lastSessionEndUtc))
             return 0f; // First session, no regression
 
-        TimeSpan timeSinceLastSession = DateTime.Now - boulderState.LastSessionEnd;
+        TimeSpan timeSinceLastSession = DateTime.UtcNow - lastSessionEndUtc;
         float daysOffline = (float)timeSinceLastSession.TotalDays;
 
         if (daysOffline < 1f)
             return 0f; // Same day or next day, minimal regression
 
         // Check if in EPOC/afterburn window
-        if (DateTime.Now < boulderState.AfterburnExpiryTime)
-        {
+        if (TryParseUtc(boulderState.AfterburnExpiryUtc, out DateTime afterburnExpiryUtc) && DateTime.UtcNow < afterburnExpiryUtc)
             return 0f; // Regression suspended during EPOC
-        }
+
+        float referenceAltitude = Mathf.Max(0f, boulderState.LifetimeAltitude);
 
         // Recovery day (1 day) gets minimal regression
         if (daysOffline <= 1f)
-            return currentSession.LifetimeAltitude * 0.02f; // 2% penalty only
+            return referenceAltitude * 0.02f; // 2% penalty only
 
         // Standard detraining curve
         float baseRegressionRate = 0.05f; // 5% per day baseline
-        float regression = currentSession.LifetimeAltitude * baseRegressionRate * Mathf.Log(daysOffline + 1f);
+        float regression = referenceAltitude * baseRegressionRate * Mathf.Log(daysOffline + 1f);
 
-        return Mathf.Min(regression, currentSession.LifetimeAltitude * 0.3f); // Cap at 30%
+        return Mathf.Min(regression, referenceAltitude * 0.3f); // Cap at 30%
     }
 
     /// <summary>
@@ -182,17 +189,19 @@ public class BoulderSystem : MonoBehaviour
     {
         if (!currentSession.IsActive) return;
 
-        currentSession.EndTime = DateTime.Now;
+        currentSession.EndTimeUtc = DateTime.UtcNow.ToString("O");
         currentSession.EPOCScore = epocScore;
 
         // EPOC afterburn window calculation
         // Zone 2 base: 4 hours, Threshold intervals: 8 hours, VO2 Max: 12-16 hours, HIT: 24-48 hours
         currentSession.AfterburnDurationHours = CalculateAfterburnDuration(epocScore);
-        boulderState.AfterburnExpiryTime = DateTime.Now.AddHours(currentSession.AfterburnDurationHours);
+        DateTime nowUtc = DateTime.UtcNow;
+        boulderState.LastSessionEndUtc = nowUtc.ToString("O");
+        boulderState.AfterburnExpiryUtc = nowUtc.AddHours(currentSession.AfterburnDurationHours).ToString("O");
+        boulderState.LifetimeSessionHours += Mathf.Max(0f, currentSessionElapsedSeconds / 3600f);
 
         currentSession.IsActive = false;
 
-        // Persist to disk
         SavePersistedState();
 
         OnProgressChanged?.Invoke($"Session ended. Total altitude: {currentSession.LifetimeAltitude:F0}m. EPOC duration: {currentSession.AfterburnDurationHours:F1}h");
@@ -226,8 +235,11 @@ public class BoulderSystem : MonoBehaviour
     public SessionData GetCurrentSession() => currentSession;
     public float GetAfterburnRemainingHours()
     {
-        var remaining = boulderState.AfterburnExpiryTime - DateTime.Now;
-        return (float)remaining.TotalHours;
+        if (!TryParseUtc(boulderState.AfterburnExpiryUtc, out DateTime afterburnExpiryUtc))
+            return 0f;
+
+        var remaining = afterburnExpiryUtc - DateTime.UtcNow;
+        return Mathf.Max(0f, (float)remaining.TotalHours);
     }
 
     private void SavePersistedState()
@@ -245,5 +257,10 @@ public class BoulderSystem : MonoBehaviour
             string json = PlayerPrefs.GetString("BoulderState");
             JsonUtility.FromJsonOverwrite(json, boulderState);
         }
+    }
+
+    private static bool TryParseUtc(string value, out DateTime parsed)
+    {
+        return DateTime.TryParse(value, null, System.Globalization.DateTimeStyles.RoundtripKind, out parsed);
     }
 }
