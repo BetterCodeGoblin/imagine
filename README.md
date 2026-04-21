@@ -1,166 +1,122 @@
-# IMAGINE — Sisyphean Exercise Game Suite
+# IMAGINE — Unreal Reboot
 
-A philosophical exercise game scaffold built in Unity around rowing, cycling, and strength training loops.
+IMAGINE is being rebooted as an **Unreal Engine project**.
 
-**Current state:** code-first prototype. The repository is ready for C# iteration and Unity assembly, but it does **not** yet include committed scenes, prefabs, UI, or polished hardware plugins.
+The original Unity-first experiment explored a Sisyphean exercise game suite tied to real exercise hardware, motion data, and philosophical framing. That direction still stands, but the repository is now being reset around an Unreal-first foundation so future development can happen in a single engine and a cleaner gameplay architecture.
 
----
+## Current Status
 
-## What is in this repo right now
+**Status:** Unreal reboot in progress  
+**Engine Direction:** Unreal Engine 5  
+**Repository State:** Foundation reset, design intent preserved, implementation restarting
 
-Included:
-- Core gameplay/system scripts under `Assets/Scripts/Core`
-- Mode scripts under `Assets/Scripts/Modes`
-- Unity project/package settings
-- Simulation-friendly scaffolding for early development
+This repository should now be treated as a design and migration scaffold, not an actively usable Unity project.
 
-Not included yet:
-- Production scenes (`.unity`)
-- Prefabs, UI, and art setup
-- Full BLE device integration
-- Bundled ErgBridge binaries
-- Final persistence/database layer
+## Why the Reset
 
-That split is intentional for now. This repo is meant to give you a solid script layer to assemble in-editor.
+The Unity prototype established some useful design ideas, but the project direction has changed.
+The new goals are:
 
----
+- rebuild the project around Unreal Engine 5
+- consolidate gameplay development into one engine stack
+- support stronger 3D gameplay prototyping and interaction systems
+- preserve the strongest concepts from the previous prototype without carrying over brittle engine-specific scaffolding
 
-## Unity version
+## What IMAGINE Still Is
 
-- **Editor version:** Unity `6000.0.0f1`
-- Recommended: use Unity 6 to avoid package/version drift
+IMAGINE remains an exercise-driven action / training experience built around struggle, repetition, physical effort, and progress through resistance.
 
----
+Core concepts being preserved:
 
-## Quick start
+- exercise-informed gameplay loops
+- progression through sustained effort
+- motion, form, and training data as design inputs
+- philosophical framing inspired by effort, burden, ascent, and repetition
+- modular mode structure for different movement / machine contexts
 
-```bash
-git clone https://github.com/BetterCodeGoblin/imagine.git
-cd imagine
-```
+## Unreal Reboot Direction
 
-Open the folder in Unity 6.
+The Unreal version is expected to focus on:
 
-### First assembly in Unity
+- a strong third-person or embodied player experience
+- clean C++ gameplay foundations with optional Blueprint-facing extension points
+- modular systems for health, progression, exercise input, and encounter logic
+- support for future hardware integration, motion capture pipelines, and training telemetry
+- vertical-slice-first development instead of broad unfinished scaffolding
 
-Because scenes are not committed yet, expect to wire things together manually in-editor.
+## Repository Structure Going Forward
 
-Recommended first scene setup:
-1. Create a new scene, for example `Assets/Scenes/TheClimbPrototype.unity`
-2. Add empty GameObjects for:
-   - `BoulderSystem`
-   - `Concept2Manager`
-   - `HeartRateManager`
-   - `TheClimb`
-3. Attach the matching scripts
-4. Enable simulation on hardware managers if you do not have devices connected yet:
-   - `Concept2Manager.simulateInput = true`
-   - `HeartRateManager.simulateHeartRate = true`
-5. Hook UI and narrator systems on top of the emitted events
+Planned top-level direction:
 
-If you only need the C# layer, the repo is already structured for that workflow.
+- `Docs/` for game design, architecture, migration notes, and hardware plans
+- `Source/` for Unreal C++ gameplay code once the UE project is initialized
+- `Content/` for Unreal assets once production begins
+- `Config/` for Unreal project configuration
 
----
+## Preserved Design Themes
 
-## Hardware integration status
+The old sub-modes still matter conceptually, even though their implementation is being restarted:
 
-### Concept 2 / PM5
+- **The Climb** , ascent / endurance / rowing-inspired effort
+- **The Ascent** , sustained output / cycling / pace and power
+- **The Burden** , strength / resistance / deliberate load management
 
-`Concept2Manager` expects an external ErgBridge executable that speaks to the PM5 and streams rowing data over localhost.
+These are now design pillars, not implementation promises.
 
-Expected default path:
+## Immediate Next Steps
 
-```text
-ErgBridge/ErgBridge.exe
-```
+1. initialize the Unreal project for IMAGINE
+2. define the first vertical slice in UE5
+3. rebuild only the systems required for that slice
+4. reintroduce hardware and motion-data integrations only when the gameplay core is working
 
-The bridge is **not bundled** in this repository. You will need to provide it separately.
+## Migration Notes
 
-Current behavior:
-- launches ErgBridge if present
-- connects to `127.0.0.1:6789`
-- parses `rate,pace,power,connected`
-- emits stroke events to gameplay systems
-- supports simulation mode for editor-side work
+The previous Unity scripts and project folders were removed from the active repository structure as part of this reset. If old Unity-specific logic is worth preserving, it should be ported intentionally into Unreal design docs or rewritten in Unreal-native form instead of carried forward as dead scaffold.
 
-### Heart rate monitor
+## Recommendation
 
-`HeartRateManager` is currently scaffolded for:
-- simulated heart rate
-- manual HR injection via code
-- zone calculation
-- RR interval storage and RMSSD calculation
+Treat this repo as the canonical home for the **Unreal version of IMAGINE** from this point onward.
 
-Actual BLE discovery/connection is **not implemented yet**.
+## Unreal Scaffold Added
 
-### Cycling and strength modes
+The repository now includes a lightweight Unreal C++ project scaffold:
 
-- `TheAscent` is still a stub for future cycling hardware integration
-- `TheBurden` supports manual set logging and progression logic, not sensor-driven strength hardware yet
+- `Imagine.uproject`
+- `Source/Imagine/`
+- `Config/`
+- `Content/`
+- `Docs/FIRST_VERTICAL_SLICE.md`
 
----
+This is a starter foundation only. It is intentionally minimal and should be expanded around the first playable slice rather than broad framework code.
 
-## Repository architecture
+## First Gameplay Scaffold
 
-### Core scripts
+A first-pass C++ gameplay scaffold is now present for the Unreal reboot:
 
-- `Assets/Scripts/Core/BoulderSystem.cs`
-  - session progress
-  - lifetime progress
-  - regression / drift
-  - lightweight PlayerPrefs persistence
+- `AImaginePlayerCharacter` for third-person player control
+- `UImagineExertionComponent` for effort / recovery state
+- `AImagineGameMode` as the minimal project game mode
 
-- `Assets/Scripts/Core/Concept2Manager.cs`
-  - ErgBridge process launch
-  - PM5 connection state
-  - simulated strokes
-  - stroke event generation
+The immediate next implementation step is input assets plus a tiny playable test map that uses exertion as the core progress tension.
 
-- `Assets/Scripts/Core/ErgBridgeClient.cs`
-  - TCP client for the local bridge
-  - background polling loop
-  - thread-safe handoff to Unity main thread
+## Push the Burden Prototype Loop
 
-- `Assets/Scripts/Core/HeartRateManager.cs`
-  - HR zone logic
-  - simulated/manual HR injection
-  - RMSSD support for future recovery features
+The current first-loop scaffold assumes a simple interaction model:
 
-### Mode scripts
+- the player performs an exert action
+- exertion increases
+- a nearby burden actor gains progress
+- recovery happens over time when the player stops
 
-- `Assets/Scripts/Modes/GameModeBase.cs`
-- `Assets/Scripts/Modes/TheClimb.cs`
-- `Assets/Scripts/Modes/TheAscent.cs`
-- `Assets/Scripts/Modes/TheBurden.cs`
+See `Docs/PUSH_THE_BURDEN_LOOP.md` for the intended first playable loop.
 
-These are meant to be attached to scene objects once you assemble the Unity side.
+## Editor Wiring Status
 
----
+The repo now includes code-side scaffolding for HUD and loop completion, but Unreal Editor setup is still required for:
 
-## Recommended next steps
+- input actions and mapping context
+- widget blueprint implementation
+- test map placement
 
-1. Create prototype scenes in Unity
-2. Add a minimal HUD for altitude, HR zone, and connection status
-3. Drop in ErgBridge locally if testing against a real PM5
-4. Reuse proven Strength-ERG code for:
-   - CSAFE command handling
-   - PM5 parsing details
-   - Bluetooth connectivity where it is already battle-tested
-5. Promote persistence from PlayerPrefs to a more durable session/history layer when needed
-
----
-
-## Reality check
-
-This repo is now best thought of as:
-- **ready for code work**
-- **ready for Unity-side assembly**
-- **not yet a frictionless clone-and-play project**
-
-That is okay. If your immediate goal is to get the script layer solid and then assemble in engine, this repo is in the right shape for that.
-
----
-
-## License
-
-Proprietary (all rights reserved). Contact `sypherdj1@gmail.com` for inquiries.
+See `Docs/EDITOR_WIRING.md`.
