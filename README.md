@@ -90,3 +90,14 @@ The repository now includes a lightweight Unreal C++ project scaffold:
 - `Docs/FIRST_VERTICAL_SLICE.md`
 
 This is a starter foundation only. It is intentionally minimal and should be expanded around the first playable slice rather than broad framework code.
+
+
+## First Gameplay Scaffold
+
+A first-pass C++ gameplay scaffold is now present for the Unreal reboot:
+
+- `AImaginePlayerCharacter` for third-person player control
+- `UImagineExertionComponent` for effort / recovery state
+- `AImagineGameMode` as the minimal project game mode
+
+The immediate next implementation step is input assets plus a tiny playable test map that uses exertion as the core progress tension.

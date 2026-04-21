@@ -39,3 +39,13 @@ A compact effort-driven traversal / action loop that communicates burden, moment
 
 ## Success Condition
 Someone can play for 2 to 5 minutes and immediately understand the fantasy of effort, burden, and progress.
+
+
+## Current Code Scaffold
+
+The repo now includes:
+- `AImaginePlayerCharacter`
+- `UImagineExertionComponent`
+- `AImagineGameMode`
+
+This is still intentionally minimal. The current code proves project shape and first-slice system boundaries, not a finished gameplay loop.
