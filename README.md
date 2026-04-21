@@ -78,6 +78,7 @@ The previous Unity scripts and project folders were removed from the active repo
 
 Treat this repo as the canonical home for the **Unreal version of IMAGINE** from this point onward.
 
+
 ## Unreal Scaffold Added
 
 The repository now includes a lightweight Unreal C++ project scaffold:
@@ -89,34 +90,3 @@ The repository now includes a lightweight Unreal C++ project scaffold:
 - `Docs/FIRST_VERTICAL_SLICE.md`
 
 This is a starter foundation only. It is intentionally minimal and should be expanded around the first playable slice rather than broad framework code.
-
-## First Gameplay Scaffold
-
-A first-pass C++ gameplay scaffold is now present for the Unreal reboot:
-
-- `AImaginePlayerCharacter` for third-person player control
-- `UImagineExertionComponent` for effort / recovery state
-- `AImagineGameMode` as the minimal project game mode
-
-The immediate next implementation step is input assets plus a tiny playable test map that uses exertion as the core progress tension.
-
-## Push the Burden Prototype Loop
-
-The current first-loop scaffold assumes a simple interaction model:
-
-- the player performs an exert action
-- exertion increases
-- a nearby burden actor gains progress
-- recovery happens over time when the player stops
-
-See `Docs/PUSH_THE_BURDEN_LOOP.md` for the intended first playable loop.
-
-## Editor Wiring Status
-
-The repo now includes code-side scaffolding for HUD and loop completion, but Unreal Editor setup is still required for:
-
-- input actions and mapping context
-- widget blueprint implementation
-- test map placement
-
-See `Docs/EDITOR_WIRING.md`.
