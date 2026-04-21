@@ -160,15 +160,15 @@ ABurdenProgressActor* AImaginePlayerCharacter::FindNearestBurdenActor() const
 
 void AImaginePlayerCharacter::SyncHUD() const
 {
-    if (APlayerController* PC = Cast<APlayerController>(GetController()))
+    if (!ExertionComponent)
     {
-        if (UImagineHUDWidget* HUD = Cast<UImagineHUDWidget>(PC->GetHUD()))
-        {
-            if (ExertionComponent)
-            {
-                HUD->UpdateExertion(ExertionComponent->GetCurrentExertion(), ExertionComponent->MaxExertion, ExertionComponent->GetExertionNormalized());
-            }
-        }
+        return;
+    }
+
+    if (GEngine)
+    {
+        const FString DebugText = FString::Printf(TEXT("Exertion: %.1f / %.1f"), ExertionComponent->GetCurrentExertion(), ExertionComponent->MaxExertion);
+        GEngine->AddOnScreenDebugMessage(1001, 0.0f, FColor::Cyan, DebugText);
     }
 }
 
