@@ -101,3 +101,15 @@ A first-pass C++ gameplay scaffold is now present for the Unreal reboot:
 - `AImagineGameMode` as the minimal project game mode
 
 The immediate next implementation step is input assets plus a tiny playable test map that uses exertion as the core progress tension.
+
+
+## Push the Burden Prototype Loop
+
+The current first-loop scaffold assumes a simple interaction model:
+
+- the player performs an exert action
+- exertion increases
+- a nearby burden actor gains progress
+- recovery happens over time when the player stops
+
+See `Docs/PUSH_THE_BURDEN_LOOP.md` for the intended first playable loop.

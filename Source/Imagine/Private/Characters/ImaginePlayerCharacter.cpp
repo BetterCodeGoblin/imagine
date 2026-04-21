@@ -1,5 +1,6 @@
 #include "Characters/ImaginePlayerCharacter.h"
 #include "Components/ImagineExertionComponent.h"
+#include "Actors/BurdenProgressActor.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -7,6 +8,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 #include "GameFramework/PlayerController.h"
+#include "EngineUtils.h"
 
 AImaginePlayerCharacter::AImaginePlayerCharacter()
 {
@@ -113,6 +115,41 @@ void AImaginePlayerCharacter::PerformExertAction(const FInputActionValue& Value)
     {
         ExertionComponent->AddExertion(15.0f);
     }
+
+    if (ABurdenProgressActor* BurdenActor = FindNearestBurdenActor())
+    {
+        BurdenActor->Interact();
+    }
+}
+
+ABurdenProgressActor* AImaginePlayerCharacter::FindNearestBurdenActor() const
+{
+    UWorld* World = GetWorld();
+    if (!World)
+    {
+        return nullptr;
+    }
+
+    ABurdenProgressActor* BestActor = nullptr;
+    float BestDistanceSq = InteractRange * InteractRange;
+
+    for (TActorIterator<ABurdenProgressActor> It(World); It; ++It)
+    {
+        ABurdenProgressActor* Candidate = *It;
+        if (!Candidate || Candidate->IsComplete())
+        {
+            continue;
+        }
+
+        const float DistanceSq = FVector::DistSquared(GetActorLocation(), Candidate->GetActorLocation());
+        if (DistanceSq <= BestDistanceSq)
+        {
+            BestDistanceSq = DistanceSq;
+            BestActor = Candidate;
+        }
+    }
+
+    return BestActor;
 }
 
 void AImaginePlayerCharacter::HandleExhausted()

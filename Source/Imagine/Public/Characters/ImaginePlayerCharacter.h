@@ -9,6 +9,7 @@ class USpringArmComponent;
 class UCameraComponent;
 class UInputMappingContext;
 class UInputAction;
+class ABurdenProgressActor;
 struct FInputActionValue;
 
 UCLASS()
@@ -45,10 +46,15 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category="Input")
     TObjectPtr<UInputAction> ExertAction;
 
+
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Imagine")
+    float InteractRange = 250.0f;
+
 private:
     void Move(const FInputActionValue& Value);
     void Look(const FInputActionValue& Value);
     void PerformExertAction(const FInputActionValue& Value);
+    ABurdenProgressActor* FindNearestBurdenActor() const;
     UFUNCTION()
     void HandleExhausted();
 };
