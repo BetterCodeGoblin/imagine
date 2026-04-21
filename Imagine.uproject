@@ -1,6 +1,6 @@
 {
   "FileVersion": 3,
-  "EngineAssociation": "5.4",
+  "EngineAssociation": "5.6",
   "Category": "Games",
   "Description": "IMAGINE Unreal reboot project scaffold.",
   "Modules": [
@@ -11,9 +11,13 @@
     }
   ],
   "Plugins": [
-    { "Name": "EnhancedInput", "Enabled": true },
-    { "Name": "GameplayTags", "Enabled": true },
-    { "Name": "Niagara", "Enabled": true },
-    { "Name": "UMG", "Enabled": true }
+    {
+      "Name": "EnhancedInput",
+      "Enabled": true
+    },
+    {
+      "Name": "Niagara",
+      "Enabled": true
+    }
   ]
 }
