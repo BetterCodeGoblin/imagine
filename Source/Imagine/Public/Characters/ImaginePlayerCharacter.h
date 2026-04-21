@@ -5,6 +5,7 @@
 #include "ImaginePlayerCharacter.generated.h"
 
 class UImagineExertionComponent;
+class UImagineHUDWidget;
 class USpringArmComponent;
 class UCameraComponent;
 class UInputMappingContext;
@@ -55,6 +56,7 @@ private:
     void Look(const FInputActionValue& Value);
     void PerformExertAction(const FInputActionValue& Value);
     ABurdenProgressActor* FindNearestBurdenActor() const;
+    void SyncHUD() const;
     UFUNCTION()
     void HandleExhausted();
 };

@@ -1,6 +1,8 @@
 #include "Characters/ImaginePlayerCharacter.h"
 #include "Components/ImagineExertionComponent.h"
 #include "Actors/BurdenProgressActor.h"
+#include "UI/ImagineHUDWidget.h"
+#include "Game/ImagineGameState.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -51,6 +53,8 @@ void AImaginePlayerCharacter::BeginPlay()
     {
         ExertionComponent->OnExhausted.AddDynamic(this, &AImaginePlayerCharacter::HandleExhausted);
     }
+
+    SyncHUD();
 }
 
 void AImaginePlayerCharacter::Tick(float DeltaSeconds)
@@ -61,6 +65,8 @@ void AImaginePlayerCharacter::Tick(float DeltaSeconds)
     {
         ExertionComponent->RecoverExertion(DeltaSeconds);
     }
+
+    SyncHUD();
 }
 
 void AImaginePlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -150,6 +156,20 @@ ABurdenProgressActor* AImaginePlayerCharacter::FindNearestBurdenActor() const
     }
 
     return BestActor;
+}
+
+void AImaginePlayerCharacter::SyncHUD() const
+{
+    if (APlayerController* PC = Cast<APlayerController>(GetController()))
+    {
+        if (UImagineHUDWidget* HUD = Cast<UImagineHUDWidget>(PC->GetHUD()))
+        {
+            if (ExertionComponent)
+            {
+                HUD->UpdateExertion(ExertionComponent->GetCurrentExertion(), ExertionComponent->MaxExertion, ExertionComponent->GetExertionNormalized());
+            }
+        }
+    }
 }
 
 void AImaginePlayerCharacter::HandleExhausted()

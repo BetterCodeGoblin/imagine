@@ -113,3 +113,14 @@ The current first-loop scaffold assumes a simple interaction model:
 - recovery happens over time when the player stops
 
 See `Docs/PUSH_THE_BURDEN_LOOP.md` for the intended first playable loop.
+
+
+## Editor Wiring Status
+
+The repo now includes code-side scaffolding for HUD and loop completion, but Unreal Editor setup is still required for:
+
+- input actions and mapping context
+- widget blueprint implementation
+- test map placement
+
+See `Docs/EDITOR_WIRING.md`.

@@ -1,4 +1,5 @@
 #include "Actors/BurdenProgressActor.h"
+#include "Game/ImagineGameState.h"
 
 ABurdenProgressActor::ABurdenProgressActor()
 {
@@ -9,6 +10,11 @@ void ABurdenProgressActor::BeginPlay()
 {
     Super::BeginPlay();
     OnProgressChanged.Broadcast(CurrentProgress, TargetProgress);
+
+    if (AImagineGameState* GS = GetWorld() ? GetWorld()->GetGameState<AImagineGameState>() : nullptr)
+    {
+        GS->SetLoopProgress(CurrentProgress, TargetProgress);
+    }
 }
 
 void ABurdenProgressActor::AddProgress(float Amount)
@@ -21,10 +27,19 @@ void ABurdenProgressActor::AddProgress(float Amount)
     CurrentProgress = FMath::Clamp(CurrentProgress + Amount, 0.0f, TargetProgress);
     OnProgressChanged.Broadcast(CurrentProgress, TargetProgress);
 
+    if (AImagineGameState* GS = GetWorld() ? GetWorld()->GetGameState<AImagineGameState>() : nullptr)
+    {
+        GS->SetLoopProgress(CurrentProgress, TargetProgress);
+    }
+
     if (!bCompletionBroadcast && IsComplete())
     {
         bCompletionBroadcast = true;
         OnProgressCompleted.Broadcast();
+        if (AImagineGameState* GS = GetWorld() ? GetWorld()->GetGameState<AImagineGameState>() : nullptr)
+        {
+            GS->MarkLoopCompleted();
+        }
         if (GEngine)
         {
             GEngine->AddOnScreenDebugMessage(-1, 3.0f, FColor::Green, TEXT("Burden progress complete."));
